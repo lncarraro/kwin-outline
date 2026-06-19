@@ -1,0 +1,17 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "lcarraro.oliveira.work@gmail.com",
+                "Name": "kwin-outline contributors"
+            }
+        ],
+        "Category": "Appearance",
+        "Description": "Draws a configurable outline around eligible application windows",
+        "EnabledByDefault": false,
+        "Id": "kwinoutline",
+        "License": "GPL-2.0-or-later",
+        "Name": "Window Outline",
+        "Version": "0.1.0"
+    }
+}
