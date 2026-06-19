@@ -1,0 +1,5 @@
+File=kwinoutlinesettings.kcfg
+ClassName=KWinOutlineSettings
+NameSpace=KWinOutline
+Mutators=true
+UseEnumTypes=true

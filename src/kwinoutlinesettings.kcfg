@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name="kwinrc" />
+    <group name="Effect-kwinoutline">
+        <entry name="Thickness" key="Thickness" type="Double">
+            <default>1.0</default>
+            <min>0.5</min>
+            <max>8.0</max>
+        </entry>
+        <entry name="Placement" key="Placement" type="Enum">
+            <choices>
+                <choice name="Inside" />
+                <choice name="Centered" />
+                <choice name="Outside" />
+            </choices>
+            <default>Inside</default>
+        </entry>
+        <entry name="ActiveColor" key="ActiveColor" type="Color">
+            <default>#3daee9</default>
+        </entry>
+        <entry name="InactiveColor" key="InactiveColor" type="Color">
+            <default>#808080</default>
+        </entry>
+        <entry name="DrawInactive" key="DrawInactive" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="IncludeUtilityWindows" key="IncludeUtilityWindows" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="ExistingDecorationOutlinePolicy" key="ExistingDecorationOutlinePolicy" type="Enum">
+            <choices>
+                <choice name="AlwaysDraw" />
+                <choice name="SkipKnownDecorationOutline" />
+            </choices>
+            <default>AlwaysDraw</default>
+        </entry>
+    </group>
+</kcfg>
