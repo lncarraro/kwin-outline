@@ -3,7 +3,11 @@
 
 kcoreaddons_add_plugin(kwinoutline
     SOURCES
+        kwinwindoweligibility.cpp
         kwinoutline.cpp
+        outlinegeometry.cpp
+        outlinewindowrenderer.cpp
+        windoweligibility.cpp
     INSTALL_NAMESPACE "kwin/effects/plugins"
 )
 
