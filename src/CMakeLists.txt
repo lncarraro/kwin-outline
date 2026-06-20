@@ -31,3 +31,5 @@ target_link_libraries(kwinoutline PRIVATE
 )
 
 install(FILES kwinoutlinesettings.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
+
+add_subdirectory(kcm)

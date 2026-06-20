@@ -15,8 +15,8 @@ include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(FeatureSummary)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
-find_package(KF6 REQUIRED COMPONENTS CoreAddons Config)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets DBus)
+find_package(KF6 REQUIRED COMPONENTS CoreAddons Config KCMUtils WidgetsAddons)
 find_package(KWin REQUIRED)
 find_package(KDecoration3 REQUIRED)
 
