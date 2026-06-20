@@ -35,6 +35,7 @@ public:
 
     bool blocksDirectScanout() const override;
     void reconfigure(ReconfigureFlags flags) override;
+    QString debug(const QString &parameter) const override;
 
 private Q_SLOTS:
     void handleWindowAdded(KWin::EffectWindow *w);
