@@ -12,6 +12,7 @@
 #include <QDBusMessage>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QFrame>
 #include <QLabel>
 #include <QVBoxLayout>
 
@@ -62,6 +63,31 @@ KWinOutlineConfigModule::KWinOutlineConfigModule(QObject *parent, const KPluginM
         m_inactiveColorButton->setEnabled(enabled);
         m_inactiveColorLabel->setEnabled(enabled);
     });
+
+    auto *separator = new QFrame(widget());
+    separator->setFrameShape(QFrame::HLine);
+    separator->setFrameShadow(QFrame::Sunken);
+    form->addRow(separator);
+
+    auto *policyHeader = new QLabel(QStringLiteral("<b>%1</b>").arg(tr("Window policy")), widget());
+    form->addRow(policyHeader);
+
+    auto *includeUtilityCheck = new QCheckBox(tr("Include utility windows"), widget());
+    includeUtilityCheck->setObjectName(QStringLiteral("kcfg_IncludeUtilityWindows"));
+    form->addRow(includeUtilityCheck);
+
+    auto *decorationPolicyCombo = new QComboBox(widget());
+    decorationPolicyCombo->setObjectName(QStringLiteral("kcfg_ExistingDecorationOutlinePolicy"));
+    decorationPolicyCombo->addItem(tr("Always draw"));
+    decorationPolicyCombo->addItem(tr("Skip known decoration outline"));
+    form->addRow(tr("Decoration outline:"), decorationPolicyCombo);
+
+    auto *noteLabel = new QLabel(
+        tr("Note: Client-painted borders inside application content cannot be detected. "
+           "If your decoration theme draws its own outline, you may need to disable it manually for a consistent appearance."),
+        widget());
+    noteLabel->setWordWrap(true);
+    form->addRow(noteLabel);
 
     addConfig(&m_settings, widget());
 }
