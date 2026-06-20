@@ -32,6 +32,7 @@ public:
     ~KWinOutlineEffect() override;
 
     bool blocksDirectScanout() const override;
+    void reconfigure(ReconfigureFlags flags) override;
 
 private Q_SLOTS:
     void handleWindowAdded(KWin::EffectWindow *w);

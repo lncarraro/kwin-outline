@@ -39,6 +39,10 @@ public:
     // stored thickness and placement. Call on windowFrameGeometryChanged.
     void updateFrameSize(const QSizeF &frameSize);
 
+    // Updates thickness and placement together and recomputes geometry.
+    // No-op if both values are unchanged.
+    void setThicknessAndPlacement(qreal thickness, OutlinePlacement placement, const QSizeF &frameSize);
+
     bool isVisible() const;
     int trackedWindowCount() const;
 

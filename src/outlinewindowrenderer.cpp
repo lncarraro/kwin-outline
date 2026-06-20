@@ -93,6 +93,24 @@ void OutlineWindowRenderer::updateFrameSize(const QSizeF &frameSize)
     setGeometry(computeOutlineGeometry(localFrame, m_thickness, m_placement));
 }
 
+void OutlineWindowRenderer::setThicknessAndPlacement(qreal thickness, OutlinePlacement placement, const QSizeF &frameSize)
+{
+    if (!m_outlineItem) {
+        return;
+    }
+    const bool thicknessChanged = !qFuzzyCompare(m_thickness, thickness);
+    const bool placementChanged = (m_placement != placement);
+    if (!thicknessChanged && !placementChanged) {
+        return;
+    }
+    m_thickness = thickness;
+    m_placement = placement;
+    updateOutline();
+    const QRectF localFrame(0.0, 0.0, frameSize.width(), frameSize.height());
+    const OutlinePlacementGeometry geom = computeOutlineGeometry(localFrame, m_thickness, m_placement);
+    m_outlineItem->setInnerRect(KWin::RectF(geom.innerRect));
+}
+
 void OutlineWindowRenderer::updateOutline()
 {
     if (m_outlineItem) {

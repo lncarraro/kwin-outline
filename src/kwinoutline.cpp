@@ -15,6 +15,11 @@
 namespace KWinOutline
 {
 
+static OutlinePlacement toOutlinePlacement(KWinOutlineSettings::EnumPlacement::type p)
+{
+    return static_cast<OutlinePlacement>(static_cast<int>(p));
+}
+
 KWinOutlineEffect::KWinOutlineEffect()
     : KWin::Effect()
     , m_settings(std::make_unique<KWinOutlineSettings>())
@@ -44,6 +49,43 @@ KWinOutlineEffect::~KWinOutlineEffect()
 bool KWinOutlineEffect::blocksDirectScanout() const
 {
     return false;
+}
+
+void KWinOutlineEffect::reconfigure(ReconfigureFlags)
+{
+    const bool oldIncludeUtility = m_settings->includeUtilityWindows();
+    const double oldThickness = m_settings->thickness();
+    const auto oldPlacement = m_settings->placement();
+    const QColor oldActiveColor = m_settings->activeColor();
+    const QColor oldInactiveColor = m_settings->inactiveColor();
+    const bool oldDrawInactive = m_settings->drawInactive();
+
+    m_settings->load();
+
+    const bool includeUtilityChanged = (m_settings->includeUtilityWindows() != oldIncludeUtility);
+    const bool geometryChanged = !qFuzzyCompare(m_settings->thickness(), oldThickness)
+                                 || (m_settings->placement() != oldPlacement);
+    const bool colorStateChanged = (m_settings->activeColor() != oldActiveColor)
+                                   || (m_settings->inactiveColor() != oldInactiveColor)
+                                   || (m_settings->drawInactive() != oldDrawInactive);
+
+    if (includeUtilityChanged) {
+        for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
+            reevaluateWindow(w);
+        }
+    }
+
+    if (geometryChanged) {
+        const double newThickness = m_settings->thickness();
+        const OutlinePlacement newPlacement = toOutlinePlacement(m_settings->placement());
+        for (auto &[w, renderer] : m_renderers) {
+            renderer->setThicknessAndPlacement(newThickness, newPlacement, w->frameGeometry().size());
+        }
+    }
+
+    if (colorStateChanged || includeUtilityChanged) {
+        applyOutlineStateToAll();
+    }
 }
 
 void KWinOutlineEffect::handleWindowAdded(KWin::EffectWindow *w)
@@ -89,7 +131,11 @@ void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
         return;
     }
 
-    m_renderers.emplace(w, std::move(renderer));
+    auto [it, inserted] = m_renderers.emplace(w, std::move(renderer));
+    it->second->setThicknessAndPlacement(
+        m_settings->thickness(),
+        toOutlinePlacement(m_settings->placement()),
+        w->frameGeometry().size());
     applyOutlineState(w);
 }
 
