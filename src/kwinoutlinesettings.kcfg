@@ -6,7 +6,7 @@
     <kcfgfile name="kwinrc" />
     <group name="Effect-kwinoutline">
         <entry name="Thickness" key="Thickness" type="Double">
-            <default>2.0</default>
+            <default>1.0</default>
             <min>0.5</min>
             <max>8.0</max>
         </entry>
@@ -19,10 +19,10 @@
             <default>Centered</default>
         </entry>
         <entry name="ActiveColor" key="ActiveColor" type="Color">
-            <default>#613daee9</default>
+            <default>#535659</default>
         </entry>
         <entry name="InactiveColor" key="InactiveColor" type="Color">
-            <default>#613daee9</default>
+            <default>#535659</default>
         </entry>
         <entry name="DrawInactive" key="DrawInactive" type="Bool">
             <default>true</default>
