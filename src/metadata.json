@@ -13,5 +13,6 @@
         "License": "GPL-2.0-or-later",
         "Name": "Window Outline",
         "Version": "0.1.0"
-    }
+    },
+    "X-KDE-ConfigModule": "kwinoutline_config"
 }

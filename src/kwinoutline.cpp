@@ -420,6 +420,12 @@ void KWinOutlineEffect::handleHasActiveFullScreenEffectChanged()
 
 } // namespace KWinOutline
 
-KWIN_EFFECT_FACTORY(KWinOutline::KWinOutlineEffect, "metadata.json")
+KWIN_EFFECT_FACTORY_SUPPORTED(KWinOutline::KWinOutlineEffect,
+                              "metadata.json",
+                              if (!KWin::effects->isOpenGLCompositing()) {
+                                  KWinOutline::debugLog("[kwinoutline] isSupported: OpenGL compositor required but current backend is not OpenGL; effect will not load");
+                                  return false;
+                              }
+                              return true;)
 
 #include "kwinoutline.moc"
