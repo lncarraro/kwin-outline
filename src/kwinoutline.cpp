@@ -3,6 +3,7 @@
 
 #include "kwinoutline.h"
 
+#include "kwinoutlinesettings.h"
 #include "kwinwindoweligibility.h"
 #include "outlinegeometry.h"
 #include "windoweligibility.h"
@@ -16,10 +17,14 @@ namespace KWinOutline
 
 KWinOutlineEffect::KWinOutlineEffect()
     : KWin::Effect()
+    , m_settings(std::make_unique<KWinOutlineSettings>())
 {
+    m_activeWindow = KWin::effects->activeWindow();
+
     connect(KWin::effects, &KWin::EffectsHandler::windowAdded, this, &KWinOutlineEffect::handleWindowAdded);
     connect(KWin::effects, &KWin::EffectsHandler::windowClosed, this, &KWinOutlineEffect::handleWindowClosed);
     connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, &KWinOutlineEffect::handleWindowDeleted);
+    connect(KWin::effects, &KWin::EffectsHandler::windowActivated, this, &KWinOutlineEffect::handleWindowActivated);
 
     // Attach outlines to windows already open when the effect loads.
     const auto existingWindows = KWin::effects->stackingOrder();
@@ -68,7 +73,7 @@ void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
     }
 
     const WindowEligibilitySnapshot snapshot = snapshotWindowEligibility(*w);
-    const WindowEligibilityOptions options;
+    const WindowEligibilityOptions options{.includeUtilityWindows = m_settings->includeUtilityWindows()};
     if (!isWindowEligibleForOutline(snapshot, options)) {
         removeWindow(w);
         return;
@@ -84,6 +89,7 @@ void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
     }
 
     m_renderers.emplace(w, std::move(renderer));
+    applyOutlineState(w);
 }
 
 void KWinOutlineEffect::removeWindow(KWin::EffectWindow *w)
@@ -119,6 +125,35 @@ void KWinOutlineEffect::handleWindowFrameGeometryChanged(KWin::EffectWindow *w, 
         return;
     }
     it->second->updateFrameSize(w->frameGeometry().size());
+}
+
+void KWinOutlineEffect::handleWindowActivated(KWin::EffectWindow *w)
+{
+    KWin::EffectWindow *previousActive = m_activeWindow;
+    m_activeWindow = w;
+
+    applyOutlineState(previousActive);
+    applyOutlineState(w);
+}
+
+void KWinOutlineEffect::applyOutlineState(KWin::EffectWindow *w)
+{
+    if (!w) {
+        return;
+    }
+    auto it = m_renderers.find(w);
+    if (it == m_renderers.end()) {
+        return;
+    }
+
+    OutlineWindowRenderer &renderer = *it->second;
+    if (w == m_activeWindow) {
+        renderer.setColor(m_settings->activeColor());
+        renderer.setVisible(true);
+    } else {
+        renderer.setColor(m_settings->inactiveColor());
+        renderer.setVisible(m_settings->drawInactive());
+    }
 }
 
 } // namespace KWinOutline
