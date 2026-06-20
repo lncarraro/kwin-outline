@@ -40,6 +40,8 @@ private Q_SLOTS:
     void handleWindowDestroyed(QObject *object);
     void handleWindowFrameGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &oldGeometry);
     void handleWindowActivated(KWin::EffectWindow *w);
+    void handleWindowFullScreenChanged(KWin::EffectWindow *w);
+    void handleHasActiveFullScreenEffectChanged();
 
 private:
     void reevaluateWindow(KWin::EffectWindow *w);
@@ -47,9 +49,11 @@ private:
     void removeWindow(QObject *object);
     void watchWindowLifetime(KWin::EffectWindow *w);
     void applyOutlineState(KWin::EffectWindow *w);
+    void applyOutlineStateToAll();
 
     std::unique_ptr<KWinOutlineSettings> m_settings;
     KWin::EffectWindow *m_activeWindow = nullptr;
+    bool m_suppressedByFullScreenEffect = false;
     std::map<KWin::EffectWindow *, std::unique_ptr<OutlineWindowRenderer>> m_renderers;
 };
 

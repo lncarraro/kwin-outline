@@ -25,6 +25,7 @@ KWinOutlineEffect::KWinOutlineEffect()
     connect(KWin::effects, &KWin::EffectsHandler::windowClosed, this, &KWinOutlineEffect::handleWindowClosed);
     connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, &KWinOutlineEffect::handleWindowDeleted);
     connect(KWin::effects, &KWin::EffectsHandler::windowActivated, this, &KWinOutlineEffect::handleWindowActivated);
+    connect(KWin::effects, &KWin::EffectsHandler::hasActiveFullScreenEffectChanged, this, &KWinOutlineEffect::handleHasActiveFullScreenEffectChanged);
 
     // Attach outlines to windows already open when the effect loads.
     const auto existingWindows = KWin::effects->stackingOrder();
@@ -116,6 +117,7 @@ void KWinOutlineEffect::watchWindowLifetime(KWin::EffectWindow *w)
 
     connect(w, &QObject::destroyed, this, &KWinOutlineEffect::handleWindowDestroyed, Qt::UniqueConnection);
     connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, &KWinOutlineEffect::handleWindowFrameGeometryChanged, Qt::UniqueConnection);
+    connect(w, &KWin::EffectWindow::windowFullScreenChanged, this, &KWinOutlineEffect::handleWindowFullScreenChanged, Qt::UniqueConnection);
 }
 
 void KWinOutlineEffect::handleWindowFrameGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &)
@@ -147,6 +149,10 @@ void KWinOutlineEffect::applyOutlineState(KWin::EffectWindow *w)
     }
 
     OutlineWindowRenderer &renderer = *it->second;
+    if (m_suppressedByFullScreenEffect) {
+        renderer.setVisible(false);
+        return;
+    }
     if (w == m_activeWindow) {
         renderer.setColor(m_settings->activeColor());
         renderer.setVisible(true);
@@ -154,6 +160,24 @@ void KWinOutlineEffect::applyOutlineState(KWin::EffectWindow *w)
         renderer.setColor(m_settings->inactiveColor());
         renderer.setVisible(m_settings->drawInactive());
     }
+}
+
+void KWinOutlineEffect::applyOutlineStateToAll()
+{
+    for (auto &[w, renderer] : m_renderers) {
+        applyOutlineState(w);
+    }
+}
+
+void KWinOutlineEffect::handleWindowFullScreenChanged(KWin::EffectWindow *w)
+{
+    reevaluateWindow(w);
+}
+
+void KWinOutlineEffect::handleHasActiveFullScreenEffectChanged()
+{
+    m_suppressedByFullScreenEffect = KWin::effects->hasActiveFullScreenEffect();
+    applyOutlineStateToAll();
 }
 
 } // namespace KWinOutline
