@@ -4,6 +4,7 @@
 #include "kwinoutline.h"
 
 #include "kwinwindoweligibility.h"
+#include "outlinegeometry.h"
 #include "windoweligibility.h"
 
 #include <effect/effect.h>
@@ -108,6 +109,16 @@ void KWinOutlineEffect::watchWindowLifetime(KWin::EffectWindow *w)
     }
 
     connect(w, &QObject::destroyed, this, &KWinOutlineEffect::handleWindowDestroyed, Qt::UniqueConnection);
+    connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, &KWinOutlineEffect::handleWindowFrameGeometryChanged, Qt::UniqueConnection);
+}
+
+void KWinOutlineEffect::handleWindowFrameGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &)
+{
+    auto it = m_renderers.find(w);
+    if (it == m_renderers.end()) {
+        return;
+    }
+    it->second->updateFrameSize(w->frameGeometry().size());
 }
 
 } // namespace KWinOutline

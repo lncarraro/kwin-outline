@@ -6,6 +6,7 @@
 #include "outlinegeometry.h"
 
 #include <QColor>
+#include <QSizeF>
 #include <memory>
 
 namespace KWin
@@ -34,6 +35,10 @@ public:
     void setVisible(bool visible);
     void setCornerRadius(qreal radius);
 
+    // Recomputes and applies outline geometry from the new frame size using
+    // stored thickness and placement. Call on windowFrameGeometryChanged.
+    void updateFrameSize(const QSizeF &frameSize);
+
     bool isVisible() const;
     int trackedWindowCount() const;
 
@@ -42,6 +47,7 @@ private:
 
     std::unique_ptr<KWin::OutlinedBorderItem> m_outlineItem;
     qreal m_thickness = 1.0;
+    OutlinePlacement m_placement = OutlinePlacement::Inside;
     QColor m_color{QStringLiteral("#3daee9")};
     qreal m_cornerRadius = 0.0;
 };

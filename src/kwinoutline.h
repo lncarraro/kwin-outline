@@ -15,6 +15,7 @@ class QObject;
 namespace KWin
 {
 class EffectWindow;
+class RectF;
 }
 
 namespace KWinOutline
@@ -35,6 +36,7 @@ private Q_SLOTS:
     void handleWindowClosed(KWin::EffectWindow *w);
     void handleWindowDeleted(KWin::EffectWindow *w);
     void handleWindowDestroyed(QObject *object);
+    void handleWindowFrameGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &oldGeometry);
 
 private:
     void reevaluateWindow(KWin::EffectWindow *w);

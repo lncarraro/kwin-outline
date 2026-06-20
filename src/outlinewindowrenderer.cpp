@@ -84,6 +84,15 @@ int OutlineWindowRenderer::trackedWindowCount() const
     return m_outlineItem ? 1 : 0;
 }
 
+void OutlineWindowRenderer::updateFrameSize(const QSizeF &frameSize)
+{
+    if (!m_outlineItem) {
+        return;
+    }
+    const QRectF localFrame(0.0, 0.0, frameSize.width(), frameSize.height());
+    setGeometry(computeOutlineGeometry(localFrame, m_thickness, m_placement));
+}
+
 void OutlineWindowRenderer::updateOutline()
 {
     if (m_outlineItem) {
