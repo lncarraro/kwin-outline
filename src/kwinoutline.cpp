@@ -12,8 +12,31 @@
 #include <effect/effecthandler.h>
 #include <effect/effectwindow.h>
 
+#include <cstdarg>
+#include <cstdio>
+
 namespace KWinOutline
 {
+
+static void debugLog(const char *format, ...)
+{
+    FILE *file = std::fopen("/tmp/kwinoutline-debug.log", "a");
+    if (!file) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    std::vfprintf(file, format, args);
+    va_end(args);
+    std::fprintf(file, "\n");
+    std::fclose(file);
+}
+
+__attribute__((constructor)) static void debugLibraryLoaded()
+{
+    debugLog("[DEBUG-kwinoutline-file] library-loaded");
+}
 
 static OutlinePlacement toOutlinePlacement(KWinOutlineSettings::EnumPlacement::type p)
 {
@@ -25,6 +48,7 @@ KWinOutlineEffect::KWinOutlineEffect()
     , m_settings(std::make_unique<KWinOutlineSettings>())
 {
     m_activeWindow = KWin::effects->activeWindow();
+    debugLog("[DEBUG-kwinoutline-file] effect-constructed activeWindow=%p", static_cast<void *>(m_activeWindow));
 
     connect(KWin::effects, &KWin::EffectsHandler::windowAdded, this, &KWinOutlineEffect::handleWindowAdded);
     connect(KWin::effects, &KWin::EffectsHandler::windowClosed, this, &KWinOutlineEffect::handleWindowClosed);
@@ -34,6 +58,7 @@ KWinOutlineEffect::KWinOutlineEffect()
 
     // Attach outlines to windows already open when the effect loads.
     const auto existingWindows = KWin::effects->stackingOrder();
+    debugLog("[DEBUG-kwinoutline-file] initial-scan count=%zu", existingWindows.size());
     for (KWin::EffectWindow *w : existingWindows) {
         watchWindowLifetime(w);
         reevaluateWindow(w);
@@ -42,6 +67,7 @@ KWinOutlineEffect::KWinOutlineEffect()
 
 KWinOutlineEffect::~KWinOutlineEffect()
 {
+    debugLog("[DEBUG-kwinoutline-file] destruct rendererCount=%zu", m_renderers.size());
     // Destroy all renderers before their WindowItems disappear.
     m_renderers.clear();
 }
@@ -61,6 +87,14 @@ void KWinOutlineEffect::reconfigure(ReconfigureFlags)
     const bool oldDrawInactive = m_settings->drawInactive();
 
     m_settings->load();
+    debugLog("[DEBUG-kwinoutline-file] reconfigure thickness=%f placement=%d active=%s inactive=%s drawInactive=%d includeUtility=%d rendererCount=%zu",
+             m_settings->thickness(),
+             static_cast<int>(m_settings->placement()),
+             qPrintable(m_settings->activeColor().name(QColor::HexArgb)),
+             qPrintable(m_settings->inactiveColor().name(QColor::HexArgb)),
+             m_settings->drawInactive(),
+             m_settings->includeUtilityWindows(),
+             m_renderers.size());
 
     const bool includeUtilityChanged = (m_settings->includeUtilityWindows() != oldIncludeUtility);
     const bool geometryChanged = !qFuzzyCompare(m_settings->thickness(), oldThickness)
@@ -90,6 +124,7 @@ void KWinOutlineEffect::reconfigure(ReconfigureFlags)
 
 void KWinOutlineEffect::handleWindowAdded(KWin::EffectWindow *w)
 {
+    debugLog("[DEBUG-kwinoutline-file] window-added window=%p", static_cast<void *>(w));
     watchWindowLifetime(w);
     reevaluateWindow(w);
 }
@@ -118,20 +153,54 @@ void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
     const WindowEligibilitySnapshot snapshot = snapshotWindowEligibility(*w);
     const WindowEligibilityOptions options{.includeUtilityWindows = m_settings->includeUtilityWindows()};
     if (!isWindowEligibleForOutline(snapshot, options)) {
+        debugLog("[DEBUG-kwinoutline-file] reject window=%p managed=%d deleted=%d fullScreen=%d internal=%d popup=%d normal=%d dialog=%d utility=%d desktop=%d dock=%d frame=%fx%f",
+                 static_cast<void *>(w),
+                 snapshot.managed,
+                 snapshot.deleted,
+                 snapshot.fullScreen,
+                 snapshot.internal,
+                 snapshot.popupWindow,
+                 snapshot.normalWindow,
+                 snapshot.dialog,
+                 snapshot.utility,
+                 snapshot.desktop,
+                 snapshot.dock,
+                 w->frameGeometry().width(),
+                 w->frameGeometry().height());
         removeWindow(w);
         return;
     }
 
     if (m_renderers.contains(w)) {
+        debugLog("[DEBUG-kwinoutline-file] keep-existing window=%p frame=%fx%f",
+                 static_cast<void *>(w),
+                 w->frameGeometry().width(),
+                 w->frameGeometry().height());
         return;
     }
 
+    debugLog("[DEBUG-kwinoutline-file] create-renderer window=%p normal=%d dialog=%d utility=%d frame=%fx%f",
+             static_cast<void *>(w),
+             snapshot.normalWindow,
+             snapshot.dialog,
+             snapshot.utility,
+             w->frameGeometry().width(),
+             w->frameGeometry().height());
+
     auto renderer = std::make_unique<OutlineWindowRenderer>(*w);
     if (renderer->trackedWindowCount() == 0) {
+        debugLog("[DEBUG-kwinoutline-file] renderer-empty window=%p frame=%fx%f",
+                 static_cast<void *>(w),
+                 w->frameGeometry().width(),
+                 w->frameGeometry().height());
         return;
     }
 
     auto [it, inserted] = m_renderers.emplace(w, std::move(renderer));
+    debugLog("[DEBUG-kwinoutline-file] renderer-inserted window=%p inserted=%d rendererCount=%zu",
+             static_cast<void *>(w),
+             inserted,
+             m_renderers.size());
     it->second->setThicknessAndPlacement(
         m_settings->thickness(),
         toOutlinePlacement(m_settings->placement()),
@@ -141,6 +210,9 @@ void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
 
 void KWinOutlineEffect::removeWindow(KWin::EffectWindow *w)
 {
+    debugLog("[DEBUG-kwinoutline-file] remove-window window=%p hadRenderer=%d",
+             static_cast<void *>(w),
+             m_renderers.contains(w));
     m_renderers.erase(w);
 }
 
@@ -148,6 +220,7 @@ void KWinOutlineEffect::removeWindow(QObject *object)
 {
     for (auto it = m_renderers.begin(); it != m_renderers.end();) {
         if (static_cast<QObject *>(it->first) == object) {
+            debugLog("[DEBUG-kwinoutline-file] remove-object object=%p", static_cast<void *>(object));
             it = m_renderers.erase(it);
         } else {
             ++it;
@@ -196,13 +269,21 @@ void KWinOutlineEffect::applyOutlineState(KWin::EffectWindow *w)
 
     OutlineWindowRenderer &renderer = *it->second;
     if (m_suppressedByFullScreenEffect) {
+        debugLog("[DEBUG-kwinoutline-file] set-state suppressed window=%p", static_cast<void *>(w));
         renderer.setVisible(false);
         return;
     }
     if (w == m_activeWindow) {
+        debugLog("[DEBUG-kwinoutline-file] set-state active window=%p color=%s",
+                 static_cast<void *>(w),
+                 qPrintable(m_settings->activeColor().name(QColor::HexArgb)));
         renderer.setColor(m_settings->activeColor());
         renderer.setVisible(true);
     } else {
+        debugLog("[DEBUG-kwinoutline-file] set-state inactive window=%p color=%s visible=%d",
+                 static_cast<void *>(w),
+                 qPrintable(m_settings->inactiveColor().name(QColor::HexArgb)),
+                 m_settings->drawInactive());
         renderer.setColor(m_settings->inactiveColor());
         renderer.setVisible(m_settings->drawInactive());
     }
@@ -223,6 +304,7 @@ void KWinOutlineEffect::handleWindowFullScreenChanged(KWin::EffectWindow *w)
 void KWinOutlineEffect::handleHasActiveFullScreenEffectChanged()
 {
     m_suppressedByFullScreenEffect = KWin::effects->hasActiveFullScreenEffect();
+    debugLog("[DEBUG-kwinoutline-file] fullscreen-effect-changed suppressed=%d", m_suppressedByFullScreenEffect);
     applyOutlineStateToAll();
 }
 
