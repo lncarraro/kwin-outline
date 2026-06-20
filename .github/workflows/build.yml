@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  arch-linux:
+    name: Arch Linux KWin build
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm --needed \
+            cmake \
+            extra-cmake-modules \
+            gcc \
+            git \
+            kcmutils \
+            kconfig \
+            kcoreaddons \
+            kdecoration \
+            kwidgetsaddons \
+            kwin \
+            ninja \
+            qt6-base
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Record dependency versions
+        run: |
+          # Arch packages are intentionally resolved from the current stable
+          # repositories so KWin and KDE Frameworks API drift is visible in CI.
+          pacman -Q \
+            cmake \
+            extra-cmake-modules \
+            gcc \
+            kcmutils \
+            kconfig \
+            kcoreaddons \
+            kdecoration \
+            kwidgetsaddons \
+            kwin \
+            ninja \
+            qt6-base
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build
+        run: cmake --build build --verbose --parallel
