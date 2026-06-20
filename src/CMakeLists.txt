@@ -25,6 +25,7 @@ target_link_libraries(kwinoutline_settings PUBLIC
 target_link_libraries(kwinoutline PRIVATE
     kwinoutline_settings
     KWin::kwin
+    KDecoration3::KDecoration
     Qt6::Core
     Qt6::Gui
 )

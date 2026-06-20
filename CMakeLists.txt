@@ -18,6 +18,7 @@ include(FeatureSummary)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(KF6 REQUIRED COMPONENTS CoreAddons Config)
 find_package(KWin REQUIRED)
+find_package(KDecoration3 REQUIRED)
 
 feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)
 
