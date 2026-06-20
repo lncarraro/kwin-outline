@@ -232,6 +232,7 @@ void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
         m_settings->thickness(),
         toOutlinePlacement(m_settings->placement()),
         w->frameGeometry().size());
+    it->second->refreshWindowRadius(*w);
     applyOutlineState(w);
 }
 
@@ -247,6 +248,12 @@ void KWinOutlineEffect::removeWindow(KWin::EffectWindow *w)
         m_decorationOutlineConnections.erase(connIt);
     }
 
+    auto radiusIt = m_decorationRadiusConnections.find(w);
+    if (radiusIt != m_decorationRadiusConnections.end()) {
+        QObject::disconnect(radiusIt->second);
+        m_decorationRadiusConnections.erase(radiusIt);
+    }
+
     m_renderers.erase(w);
 }
 
@@ -260,6 +267,12 @@ void KWinOutlineEffect::removeWindow(QObject *object)
             if (connIt != m_decorationOutlineConnections.end()) {
                 QObject::disconnect(connIt->second);
                 m_decorationOutlineConnections.erase(connIt);
+            }
+
+            auto radiusIt = m_decorationRadiusConnections.find(it->first);
+            if (radiusIt != m_decorationRadiusConnections.end()) {
+                QObject::disconnect(radiusIt->second);
+                m_decorationRadiusConnections.erase(radiusIt);
             }
 
             it = m_renderers.erase(it);
@@ -279,15 +292,21 @@ void KWinOutlineEffect::watchWindowLifetime(KWin::EffectWindow *w)
     connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, &KWinOutlineEffect::handleWindowFrameGeometryChanged, Qt::UniqueConnection);
     connect(w, &KWin::EffectWindow::windowFullScreenChanged, this, &KWinOutlineEffect::handleWindowFullScreenChanged, Qt::UniqueConnection);
     connect(w, &KWin::EffectWindow::windowDecorationChanged, this, &KWinOutlineEffect::handleWindowDecorationChanged, Qt::UniqueConnection);
-    connectDecorationOutlineSignal(w);
+    connectDecorationSignals(w);
 }
 
-void KWinOutlineEffect::connectDecorationOutlineSignal(KWin::EffectWindow *w)
+void KWinOutlineEffect::connectDecorationSignals(KWin::EffectWindow *w)
 {
-    auto it = m_decorationOutlineConnections.find(w);
-    if (it != m_decorationOutlineConnections.end()) {
-        QObject::disconnect(it->second);
-        m_decorationOutlineConnections.erase(it);
+    // Disconnect any previous decoration signal connections for this window.
+    auto outlineIt = m_decorationOutlineConnections.find(w);
+    if (outlineIt != m_decorationOutlineConnections.end()) {
+        QObject::disconnect(outlineIt->second);
+        m_decorationOutlineConnections.erase(outlineIt);
+    }
+    auto radiusIt = m_decorationRadiusConnections.find(w);
+    if (radiusIt != m_decorationRadiusConnections.end()) {
+        QObject::disconnect(radiusIt->second);
+        m_decorationRadiusConnections.erase(radiusIt);
     }
 
     KDecoration3::Decoration *decoration = w->decoration();
@@ -295,11 +314,26 @@ void KWinOutlineEffect::connectDecorationOutlineSignal(KWin::EffectWindow *w)
         return;
     }
 
-    auto conn = connect(decoration, &KDecoration3::Decoration::borderOutlineChanged, this, [this, w]() {
+    auto outlineConn = connect(decoration, &KDecoration3::Decoration::borderOutlineChanged, this, [this, w]() {
         debugLog("[DEBUG-kwinoutline-file] border-outline-changed window=%p", static_cast<void *>(w));
         reevaluateWindow(w);
     });
-    m_decorationOutlineConnections.emplace(w, conn);
+    m_decorationOutlineConnections.emplace(w, outlineConn);
+
+    auto radiusConn = connect(decoration, &KDecoration3::Decoration::borderRadiusChanged, this, [this, w]() {
+        debugLog("[DEBUG-kwinoutline-file] border-radius-changed window=%p", static_cast<void *>(w));
+        updateWindowRadius(w);
+    });
+    m_decorationRadiusConnections.emplace(w, radiusConn);
+}
+
+void KWinOutlineEffect::updateWindowRadius(KWin::EffectWindow *w)
+{
+    auto it = m_renderers.find(w);
+    if (it == m_renderers.end()) {
+        return;
+    }
+    it->second->refreshWindowRadius(*w);
 }
 
 void KWinOutlineEffect::handleWindowFrameGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &)
@@ -370,8 +404,11 @@ void KWinOutlineEffect::handleWindowDecorationChanged(KWin::EffectWindow *w)
              static_cast<void *>(w),
              w->hasDecoration(),
              decorationProvidesOutline(*w));
-    connectDecorationOutlineSignal(w);
+    connectDecorationSignals(w);
     reevaluateWindow(w);
+    // reevaluateWindow only creates a renderer if one is absent. For existing
+    // renderers, refresh the radius from the new decoration.
+    updateWindowRadius(w);
 }
 
 void KWinOutlineEffect::handleHasActiveFullScreenEffectChanged()

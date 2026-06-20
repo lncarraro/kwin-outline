@@ -12,6 +12,9 @@
 #include <scene/outlinedborderitem.h>
 #include <scene/windowitem.h>
 
+#include <kdecoration3/decoration.h>
+
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 
@@ -48,7 +51,7 @@ OutlineWindowRenderer::OutlineWindowRenderer(KWin::EffectWindow &window)
     const QRectF localFrame(0.0, 0.0, frameSize.width(), frameSize.height());
     const OutlinePlacementGeometry geom = computeOutlineGeometry(localFrame, m_thickness, OutlinePlacement::Inside);
 
-    const KWin::BorderOutline outline(m_thickness, m_color, KWin::BorderRadius(m_cornerRadius));
+    const KWin::BorderOutline outline(m_thickness, m_color, computeInnerRadius());
     m_outlineItem = std::make_unique<KWin::OutlinedBorderItem>(KWin::RectF(geom.innerRect), outline, windowItem);
     m_outlineItem->stackAfter(windowItem->windowContainer());
     debugLog("[DEBUG-kwinoutline-file] renderer-ctor created window=%p windowItem=%p container=%p frame=%fx%f inner=%f,%f,%f,%f itemRect=%f,%f,%f,%f bounding=%f,%f,%f,%f visible=%d color=%s thickness=%f",
@@ -142,13 +145,42 @@ void OutlineWindowRenderer::setVisible(bool visible)
     }
 }
 
-void OutlineWindowRenderer::setCornerRadius(qreal radius)
+void OutlineWindowRenderer::refreshWindowRadius(KWin::EffectWindow &window)
 {
-    if (qFuzzyCompare(m_cornerRadius, radius)) {
+    KWin::BorderRadius outerRadius;
+
+    // SSD: decoration provides the authoritative corner radius.
+    const KDecoration3::Decoration *decoration = window.decoration();
+    if (decoration) {
+        outerRadius = KWin::BorderRadius::from(decoration->borderRadius());
+    } else {
+        // CSD/undecorated: use whatever KWin's scene has computed for this item.
+        const KWin::WindowItem *item = window.windowItem();
+        if (item) {
+            outerRadius = item->borderRadius();
+        }
+    }
+
+    if (outerRadius == m_windowOuterRadius) {
         return;
     }
-    m_cornerRadius = radius;
+    m_windowOuterRadius = outerRadius;
     updateOutline();
+}
+
+KWin::BorderRadius OutlineWindowRenderer::computeInnerRadius() const
+{
+    // The outline's inner rect is inset from the frame outer edge by `inset` on each side.
+    // BorderOutline's radius field is the inner-edge corner radius. The outer-edge corner
+    // radius = innerRadius + thickness. So innerRadius = outerRadius - inset.
+    const qreal inset = (m_placement == OutlinePlacement::Inside) ? m_thickness
+                      : (m_placement == OutlinePlacement::Centered) ? m_thickness / 2.0
+                      : 0.0;
+    return KWin::BorderRadius(
+        std::max(0.0, m_windowOuterRadius.topLeft() - inset),
+        std::max(0.0, m_windowOuterRadius.topRight() - inset),
+        std::max(0.0, m_windowOuterRadius.bottomRight() - inset),
+        std::max(0.0, m_windowOuterRadius.bottomLeft() - inset));
 }
 
 bool OutlineWindowRenderer::isVisible() const
@@ -209,11 +241,16 @@ void OutlineWindowRenderer::setThicknessAndPlacement(qreal thickness, OutlinePla
 void OutlineWindowRenderer::updateOutline()
 {
     if (m_outlineItem) {
-        m_outlineItem->setOutline(KWin::BorderOutline(m_thickness, m_color, KWin::BorderRadius(m_cornerRadius)));
-        debugLog("[DEBUG-kwinoutline-file] renderer-update-outline thickness=%f color=%s visible=%d",
+        const KWin::BorderRadius innerRadius = computeInnerRadius();
+        m_outlineItem->setOutline(KWin::BorderOutline(m_thickness, m_color, innerRadius));
+        debugLog("[DEBUG-kwinoutline-file] renderer-update-outline thickness=%f color=%s visible=%d radius-tl=%f tr=%f br=%f bl=%f",
                  m_thickness,
                  qPrintable(m_color.name(QColor::HexArgb)),
-                 m_outlineItem->isVisible());
+                 m_outlineItem->isVisible(),
+                 innerRadius.topLeft(),
+                 innerRadius.topRight(),
+                 innerRadius.bottomRight(),
+                 innerRadius.bottomLeft());
     }
 }
 

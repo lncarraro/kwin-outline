@@ -52,7 +52,8 @@ private:
     void removeWindow(KWin::EffectWindow *w);
     void removeWindow(QObject *object);
     void watchWindowLifetime(KWin::EffectWindow *w);
-    void connectDecorationOutlineSignal(KWin::EffectWindow *w);
+    void connectDecorationSignals(KWin::EffectWindow *w);
+    void updateWindowRadius(KWin::EffectWindow *w);
     void applyOutlineState(KWin::EffectWindow *w);
     void applyOutlineStateToAll();
 
@@ -61,6 +62,7 @@ private:
     bool m_suppressedByFullScreenEffect = false;
     std::map<KWin::EffectWindow *, std::unique_ptr<OutlineWindowRenderer>> m_renderers;
     std::map<KWin::EffectWindow *, QMetaObject::Connection> m_decorationOutlineConnections;
+    std::map<KWin::EffectWindow *, QMetaObject::Connection> m_decorationRadiusConnections;
 };
 
 } // namespace KWinOutline
