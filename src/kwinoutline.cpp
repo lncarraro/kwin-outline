@@ -17,12 +17,14 @@ KWinOutlineEffect::KWinOutlineEffect()
     : KWin::Effect()
 {
     connect(KWin::effects, &KWin::EffectsHandler::windowAdded, this, &KWinOutlineEffect::handleWindowAdded);
+    connect(KWin::effects, &KWin::EffectsHandler::windowClosed, this, &KWinOutlineEffect::handleWindowClosed);
     connect(KWin::effects, &KWin::EffectsHandler::windowDeleted, this, &KWinOutlineEffect::handleWindowDeleted);
 
     // Attach outlines to windows already open when the effect loads.
     const auto existingWindows = KWin::effects->stackingOrder();
     for (KWin::EffectWindow *w : existingWindows) {
-        addWindow(w);
+        watchWindowLifetime(w);
+        reevaluateWindow(w);
     }
 }
 
@@ -39,22 +41,73 @@ bool KWinOutlineEffect::blocksDirectScanout() const
 
 void KWinOutlineEffect::handleWindowAdded(KWin::EffectWindow *w)
 {
-    addWindow(w);
+    watchWindowLifetime(w);
+    reevaluateWindow(w);
+}
+
+void KWinOutlineEffect::handleWindowClosed(KWin::EffectWindow *w)
+{
+    removeWindow(w);
 }
 
 void KWinOutlineEffect::handleWindowDeleted(KWin::EffectWindow *w)
 {
-    m_renderers.erase(w);
+    removeWindow(w);
 }
 
-void KWinOutlineEffect::addWindow(KWin::EffectWindow *w)
+void KWinOutlineEffect::handleWindowDestroyed(QObject *object)
 {
+    removeWindow(object);
+}
+
+void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
+{
+    if (!w) {
+        return;
+    }
+
     const WindowEligibilitySnapshot snapshot = snapshotWindowEligibility(*w);
     const WindowEligibilityOptions options;
     if (!isWindowEligibleForOutline(snapshot, options)) {
+        removeWindow(w);
         return;
     }
-    m_renderers.emplace(w, std::make_unique<OutlineWindowRenderer>(*w));
+
+    if (m_renderers.contains(w)) {
+        return;
+    }
+
+    auto renderer = std::make_unique<OutlineWindowRenderer>(*w);
+    if (renderer->trackedWindowCount() == 0) {
+        return;
+    }
+
+    m_renderers.emplace(w, std::move(renderer));
+}
+
+void KWinOutlineEffect::removeWindow(KWin::EffectWindow *w)
+{
+    m_renderers.erase(w);
+}
+
+void KWinOutlineEffect::removeWindow(QObject *object)
+{
+    for (auto it = m_renderers.begin(); it != m_renderers.end();) {
+        if (static_cast<QObject *>(it->first) == object) {
+            it = m_renderers.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void KWinOutlineEffect::watchWindowLifetime(KWin::EffectWindow *w)
+{
+    if (!w) {
+        return;
+    }
+
+    connect(w, &QObject::destroyed, this, &KWinOutlineEffect::handleWindowDestroyed, Qt::UniqueConnection);
 }
 
 } // namespace KWinOutline

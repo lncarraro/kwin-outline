@@ -10,6 +10,8 @@
 #include <map>
 #include <memory>
 
+class QObject;
+
 namespace KWin
 {
 class EffectWindow;
@@ -30,13 +32,16 @@ public:
 
 private Q_SLOTS:
     void handleWindowAdded(KWin::EffectWindow *w);
+    void handleWindowClosed(KWin::EffectWindow *w);
     void handleWindowDeleted(KWin::EffectWindow *w);
+    void handleWindowDestroyed(QObject *object);
 
 private:
-    void addWindow(KWin::EffectWindow *w);
+    void reevaluateWindow(KWin::EffectWindow *w);
+    void removeWindow(KWin::EffectWindow *w);
+    void removeWindow(QObject *object);
+    void watchWindowLifetime(KWin::EffectWindow *w);
 
-    // Dev hook (Phase 07): minimal per-window renderer map.
-    // Phase 09 replaces this with full registry lifecycle.
     std::map<KWin::EffectWindow *, std::unique_ptr<OutlineWindowRenderer>> m_renderers;
 };
 
