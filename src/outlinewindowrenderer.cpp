@@ -147,12 +147,21 @@ void OutlineWindowRenderer::setVisible(bool visible)
 
 void OutlineWindowRenderer::refreshWindowRadius(KWin::EffectWindow &window)
 {
+    bool useExplicitInnerRadius = false;
+    KWin::BorderRadius explicitInnerRadius;
     KWin::BorderRadius outerRadius;
 
-    // SSD: decoration provides the authoritative corner radius.
+    // SSD: if the decoration exposes an outline, its radius already has the
+    // same inner-edge semantics that KWin::OutlinedBorderItem expects.
     const KDecoration3::Decoration *decoration = window.decoration();
     if (decoration) {
-        outerRadius = KWin::BorderRadius::from(decoration->borderRadius());
+        const KWin::BorderOutline decorationOutline = KWin::BorderOutline::from(decoration->borderOutline());
+        if (!decorationOutline.isNull()) {
+            useExplicitInnerRadius = true;
+            explicitInnerRadius = decorationOutline.radius();
+        } else {
+            outerRadius = KWin::BorderRadius::from(decoration->borderRadius());
+        }
     } else {
         // CSD/undecorated: use whatever KWin's scene has computed for this item.
         const KWin::WindowItem *item = window.windowItem();
@@ -161,14 +170,29 @@ void OutlineWindowRenderer::refreshWindowRadius(KWin::EffectWindow &window)
         }
     }
 
-    if (outerRadius == m_windowOuterRadius) {
+    debugLog("[DEBUG-kwinoutline-file] renderer-refresh-radius source=%s explicit-tl=%f tr=%f br=%f bl=%f outer-tl=%f tr=%f br=%f bl=%f",
+             useExplicitInnerRadius ? "decoration-outline" : (decoration ? "decoration-radius" : "window-item-radius"),
+             explicitInnerRadius.topLeft(),
+             explicitInnerRadius.topRight(),
+             explicitInnerRadius.bottomRight(),
+             explicitInnerRadius.bottomLeft(),
+             outerRadius.topLeft(),
+             outerRadius.topRight(),
+             outerRadius.bottomRight(),
+             outerRadius.bottomLeft());
+
+    if (useExplicitInnerRadius == m_useExplicitInnerRadius
+        && explicitInnerRadius == m_explicitInnerRadius
+        && outerRadius == m_windowOuterRadius) {
         return;
     }
+    m_useExplicitInnerRadius = useExplicitInnerRadius;
+    m_explicitInnerRadius = explicitInnerRadius;
     m_windowOuterRadius = outerRadius;
     updateOutline();
 }
 
-KWin::BorderRadius OutlineWindowRenderer::computeInnerRadius() const
+KWin::BorderRadius OutlineWindowRenderer::computeInnerRadiusFromOuterRadius(const KWin::BorderRadius &outerRadius) const
 {
     // The outline's inner rect is inset from the frame outer edge by `inset` on each side.
     // BorderOutline's radius field is the inner-edge corner radius. The outer-edge corner
@@ -177,10 +201,18 @@ KWin::BorderRadius OutlineWindowRenderer::computeInnerRadius() const
                       : (m_placement == OutlinePlacement::Centered) ? m_thickness / 2.0
                       : 0.0;
     return KWin::BorderRadius(
-        std::max(0.0, m_windowOuterRadius.topLeft() - inset),
-        std::max(0.0, m_windowOuterRadius.topRight() - inset),
-        std::max(0.0, m_windowOuterRadius.bottomRight() - inset),
-        std::max(0.0, m_windowOuterRadius.bottomLeft() - inset));
+        std::max(0.0, outerRadius.topLeft() - inset),
+        std::max(0.0, outerRadius.topRight() - inset),
+        std::max(0.0, outerRadius.bottomRight() - inset),
+        std::max(0.0, outerRadius.bottomLeft() - inset));
+}
+
+KWin::BorderRadius OutlineWindowRenderer::computeInnerRadius() const
+{
+    if (m_useExplicitInnerRadius) {
+        return m_explicitInnerRadius;
+    }
+    return computeInnerRadiusFromOuterRadius(m_windowOuterRadius);
 }
 
 bool OutlineWindowRenderer::isVisible() const

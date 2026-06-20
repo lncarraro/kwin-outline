@@ -56,12 +56,15 @@ private:
     // Returns the inner-edge BorderRadius to pass to BorderOutline, derived from
     // m_windowOuterRadius, m_placement, and m_thickness.
     KWin::BorderRadius computeInnerRadius() const;
+    KWin::BorderRadius computeInnerRadiusFromOuterRadius(const KWin::BorderRadius &outerRadius) const;
     void updateOutline();
 
     std::unique_ptr<KWin::OutlinedBorderItem> m_outlineItem;
     qreal m_thickness = 1.0;
     OutlinePlacement m_placement = OutlinePlacement::Inside;
     QColor m_color{QStringLiteral("#3daee9")};
+    bool m_useExplicitInnerRadius = false;
+    KWin::BorderRadius m_explicitInnerRadius; // inner-edge radius from decoration borderOutline()
     KWin::BorderRadius m_windowOuterRadius; // outer corner radius of the window frame; zero = rectangular
 };
 
