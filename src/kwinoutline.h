@@ -10,6 +10,8 @@
 #include <map>
 #include <memory>
 
+#include <QMetaObject>
+
 class QObject;
 
 namespace KWin
@@ -42,6 +44,7 @@ private Q_SLOTS:
     void handleWindowFrameGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &oldGeometry);
     void handleWindowActivated(KWin::EffectWindow *w);
     void handleWindowFullScreenChanged(KWin::EffectWindow *w);
+    void handleWindowDecorationChanged(KWin::EffectWindow *w);
     void handleHasActiveFullScreenEffectChanged();
 
 private:
@@ -49,6 +52,7 @@ private:
     void removeWindow(KWin::EffectWindow *w);
     void removeWindow(QObject *object);
     void watchWindowLifetime(KWin::EffectWindow *w);
+    void connectDecorationOutlineSignal(KWin::EffectWindow *w);
     void applyOutlineState(KWin::EffectWindow *w);
     void applyOutlineStateToAll();
 
@@ -56,6 +60,7 @@ private:
     KWin::EffectWindow *m_activeWindow = nullptr;
     bool m_suppressedByFullScreenEffect = false;
     std::map<KWin::EffectWindow *, std::unique_ptr<OutlineWindowRenderer>> m_renderers;
+    std::map<KWin::EffectWindow *, QMetaObject::Connection> m_decorationOutlineConnections;
 };
 
 } // namespace KWinOutline

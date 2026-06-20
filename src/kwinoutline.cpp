@@ -12,6 +12,8 @@
 #include <effect/effecthandler.h>
 #include <effect/effectwindow.h>
 
+#include <kdecoration3/decoration.h>
+
 #include <cstdarg>
 #include <cstdio>
 
@@ -41,6 +43,18 @@ __attribute__((constructor)) static void debugLibraryLoaded()
 static OutlinePlacement toOutlinePlacement(KWinOutlineSettings::EnumPlacement::type p)
 {
     return static_cast<OutlinePlacement>(static_cast<int>(p));
+}
+
+static bool decorationProvidesOutline(const KWin::EffectWindow &w)
+{
+    if (!w.hasDecoration()) {
+        return false;
+    }
+    const KDecoration3::Decoration *decoration = w.decoration();
+    if (!decoration) {
+        return false;
+    }
+    return !decoration->borderOutline().isNull();
 }
 
 KWinOutlineEffect::KWinOutlineEffect()
@@ -85,25 +99,28 @@ void KWinOutlineEffect::reconfigure(ReconfigureFlags)
     const QColor oldActiveColor = m_settings->activeColor();
     const QColor oldInactiveColor = m_settings->inactiveColor();
     const bool oldDrawInactive = m_settings->drawInactive();
+    const auto oldDecorationPolicy = m_settings->existingDecorationOutlinePolicy();
 
     m_settings->load();
-    debugLog("[DEBUG-kwinoutline-file] reconfigure thickness=%f placement=%d active=%s inactive=%s drawInactive=%d includeUtility=%d rendererCount=%zu",
+    debugLog("[DEBUG-kwinoutline-file] reconfigure thickness=%f placement=%d active=%s inactive=%s drawInactive=%d includeUtility=%d decorationPolicy=%d rendererCount=%zu",
              m_settings->thickness(),
              static_cast<int>(m_settings->placement()),
              qPrintable(m_settings->activeColor().name(QColor::HexArgb)),
              qPrintable(m_settings->inactiveColor().name(QColor::HexArgb)),
              m_settings->drawInactive(),
              m_settings->includeUtilityWindows(),
+             static_cast<int>(m_settings->existingDecorationOutlinePolicy()),
              m_renderers.size());
 
     const bool includeUtilityChanged = (m_settings->includeUtilityWindows() != oldIncludeUtility);
+    const bool decorationPolicyChanged = (m_settings->existingDecorationOutlinePolicy() != oldDecorationPolicy);
     const bool geometryChanged = !qFuzzyCompare(m_settings->thickness(), oldThickness)
                                  || (m_settings->placement() != oldPlacement);
     const bool colorStateChanged = (m_settings->activeColor() != oldActiveColor)
                                    || (m_settings->inactiveColor() != oldInactiveColor)
                                    || (m_settings->drawInactive() != oldDrawInactive);
 
-    if (includeUtilityChanged) {
+    if (includeUtilityChanged || decorationPolicyChanged) {
         for (KWin::EffectWindow *w : KWin::effects->stackingOrder()) {
             reevaluateWindow(w);
         }
@@ -171,6 +188,16 @@ void KWinOutlineEffect::reevaluateWindow(KWin::EffectWindow *w)
         return;
     }
 
+    const auto policy = m_settings->existingDecorationOutlinePolicy();
+    if (policy == KWinOutlineSettings::EnumExistingDecorationOutlinePolicy::SkipKnownDecorationOutline
+        && decorationProvidesOutline(*w)) {
+        debugLog("[DEBUG-kwinoutline-file] skip-decoration-outline window=%p hasDecoration=%d",
+                 static_cast<void *>(w),
+                 w->hasDecoration());
+        removeWindow(w);
+        return;
+    }
+
     if (m_renderers.contains(w)) {
         debugLog("[DEBUG-kwinoutline-file] keep-existing window=%p frame=%fx%f",
                  static_cast<void *>(w),
@@ -213,6 +240,13 @@ void KWinOutlineEffect::removeWindow(KWin::EffectWindow *w)
     debugLog("[DEBUG-kwinoutline-file] remove-window window=%p hadRenderer=%d",
              static_cast<void *>(w),
              m_renderers.contains(w));
+
+    auto connIt = m_decorationOutlineConnections.find(w);
+    if (connIt != m_decorationOutlineConnections.end()) {
+        QObject::disconnect(connIt->second);
+        m_decorationOutlineConnections.erase(connIt);
+    }
+
     m_renderers.erase(w);
 }
 
@@ -221,6 +255,13 @@ void KWinOutlineEffect::removeWindow(QObject *object)
     for (auto it = m_renderers.begin(); it != m_renderers.end();) {
         if (static_cast<QObject *>(it->first) == object) {
             debugLog("[DEBUG-kwinoutline-file] remove-object object=%p", static_cast<void *>(object));
+
+            auto connIt = m_decorationOutlineConnections.find(it->first);
+            if (connIt != m_decorationOutlineConnections.end()) {
+                QObject::disconnect(connIt->second);
+                m_decorationOutlineConnections.erase(connIt);
+            }
+
             it = m_renderers.erase(it);
         } else {
             ++it;
@@ -237,6 +278,28 @@ void KWinOutlineEffect::watchWindowLifetime(KWin::EffectWindow *w)
     connect(w, &QObject::destroyed, this, &KWinOutlineEffect::handleWindowDestroyed, Qt::UniqueConnection);
     connect(w, &KWin::EffectWindow::windowFrameGeometryChanged, this, &KWinOutlineEffect::handleWindowFrameGeometryChanged, Qt::UniqueConnection);
     connect(w, &KWin::EffectWindow::windowFullScreenChanged, this, &KWinOutlineEffect::handleWindowFullScreenChanged, Qt::UniqueConnection);
+    connect(w, &KWin::EffectWindow::windowDecorationChanged, this, &KWinOutlineEffect::handleWindowDecorationChanged, Qt::UniqueConnection);
+    connectDecorationOutlineSignal(w);
+}
+
+void KWinOutlineEffect::connectDecorationOutlineSignal(KWin::EffectWindow *w)
+{
+    auto it = m_decorationOutlineConnections.find(w);
+    if (it != m_decorationOutlineConnections.end()) {
+        QObject::disconnect(it->second);
+        m_decorationOutlineConnections.erase(it);
+    }
+
+    KDecoration3::Decoration *decoration = w->decoration();
+    if (!decoration) {
+        return;
+    }
+
+    auto conn = connect(decoration, &KDecoration3::Decoration::borderOutlineChanged, this, [this, w]() {
+        debugLog("[DEBUG-kwinoutline-file] border-outline-changed window=%p", static_cast<void *>(w));
+        reevaluateWindow(w);
+    });
+    m_decorationOutlineConnections.emplace(w, conn);
 }
 
 void KWinOutlineEffect::handleWindowFrameGeometryChanged(KWin::EffectWindow *w, const KWin::RectF &)
@@ -298,6 +361,16 @@ void KWinOutlineEffect::applyOutlineStateToAll()
 
 void KWinOutlineEffect::handleWindowFullScreenChanged(KWin::EffectWindow *w)
 {
+    reevaluateWindow(w);
+}
+
+void KWinOutlineEffect::handleWindowDecorationChanged(KWin::EffectWindow *w)
+{
+    debugLog("[DEBUG-kwinoutline-file] decoration-changed window=%p hasDecoration=%d providesOutline=%d",
+             static_cast<void *>(w),
+             w->hasDecoration(),
+             decorationProvidesOutline(*w));
+    connectDecorationOutlineSignal(w);
     reevaluateWindow(w);
 }
 
