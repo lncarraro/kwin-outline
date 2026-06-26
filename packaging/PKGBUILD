@@ -1,0 +1,49 @@
+# Maintainer: kwin-outline contributors <lcarraro.oliveira.work@gmail.com>
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+pkgname=kwin-outline-git
+pkgver=r1.0000000
+pkgrel=1
+pkgdesc="Native KWin effect that draws a configurable outline around application windows"
+arch=(x86_64)
+url="https://github.com/lncarraro/kwin-outline"
+license=(GPL-2.0-or-later)
+depends=(
+    kdecoration
+    kcmutils
+    kconfig
+    kcoreaddons
+    kwidgetsaddons
+    kwin
+    qt6-base
+)
+makedepends=(
+    cmake
+    extra-cmake-modules
+    git
+    ninja
+    vulkan-headers
+)
+provides=(kwin-outline)
+conflicts=(kwin-outline)
+source=("${pkgname}::git+https://github.com/lncarraro/kwin-outline.git")
+sha256sums=(SKIP)
+
+pkgver() {
+    cd "${pkgname}"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cmake -B build -S "${pkgname}" \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build build
+}
+
+package() {
+    DESTDIR="${pkgdir}" cmake --install build
+    install -Dm644 "${pkgname}/LICENSES/GPL-2.0-or-later.txt" \
+        "${pkgdir}/usr/share/licenses/${pkgname}/GPL-2.0-or-later.txt"
+}
