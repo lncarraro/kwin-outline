@@ -37,4 +37,4 @@ else
 fi
 
 echo "Install complete. Debug logs:"
-echo "journalctl --user -b --no-pager | rg 'DEBUG-kwinoutline'"
+echo "tail -f /tmp/kwinoutline-debug.log"
