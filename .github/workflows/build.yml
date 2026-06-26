@@ -15,9 +15,23 @@ jobs:
       image: archlinux:base-devel
 
     steps:
+      - name: Refresh keyring
+        run: pacman -Sy --noconfirm archlinux-keyring
+
+      - name: Compute weekly cache key
+        id: date
+        run: echo "week=$(date +%Y-%U)" >> $GITHUB_OUTPUT
+
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: arch-pkgs-${{ steps.date.outputs.week }}-${{ hashFiles('.github/workflows/build.yml') }}
+          restore-keys: |
+            arch-pkgs-${{ steps.date.outputs.week }}-
+
       - name: Install build dependencies
         run: |
-          pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm --needed \
             cmake \
             extra-cmake-modules \
@@ -30,7 +44,8 @@ jobs:
             kwidgetsaddons \
             kwin \
             ninja \
-            qt6-base
+            qt6-base \
+            vulkan-headers
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -50,7 +65,8 @@ jobs:
             kwidgetsaddons \
             kwin \
             ninja \
-            qt6-base
+            qt6-base \
+            vulkan-headers
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
